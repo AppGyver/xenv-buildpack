@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# bin/compile <build-dir> <cache-dir> <env-dir>
+
+. ./scripts/helpers.sh
+
+BUILD_DIR=$1
+CACHE_DIR=$2
+ENV_DIR=$3
+
+export_env_dir $ENV_DIR
+
+XENV_DIR="${BUILD_DIR}/xenv"
+echo "Adding XEnv components" | indent
+
+mkdir -p "${XENV_DIR}/bin"
+mkdir -p "${XENV_DIR}/lib"
+
+cp -r bin lib "${XENV_DIR}"
+
+echo "Exporting PATH and LIBRARY_PATH" | indent
+PROFILE_PATH="$BUILD_DIR/.profile.d/xenv.sh"
+mkdir -p $(dirname $PROFILE_PATH)
+cp profile/xenv.sh "$PROFILE_PATH"
+
+XENV_PANIC_ON_ERROR=${XENV_PANIC_ON_ERROR:-true}
+
+XENV_RUN=${XENV_RUN:-true}
+export XENV_PANIC_ON_ERROR
+export XENV_RUN
+
+echo "Running: bin/xenv" | indent
+set -o pipefail # fail when any part of pipe fails
+bin/xenv | indent

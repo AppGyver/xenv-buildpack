@@ -1,0 +1,45 @@
+#!/usr/bin/env ruby
+require "optparse"
+
+require_relative "../lib/xenv"
+require_relative "../lib/heroku_app"
+require_relative "../lib/config_merger"
+
+options = {run: false}
+OptionParser.new do |opts|
+  opts.banner = "Usage: xenv [options]"
+
+  opts.on("-r", "--[no-]run", "Perform changes to Heroku config") do |v|
+    options[:run] = v
+  end
+end.parse!
+
+ENV["XENV_RUN"] ||= options[:run].to_s
+
+unless ENV["XENV_URL"]
+  $stderr.puts "Required ENV unset: \"XENV_URL\""
+  $stderr.puts "Skipping running xenv"
+  exit
+end
+
+unless ENV["XENV_HEROKU_APP_NAME"]
+  $stderr.puts "Required ENV unset: \"XENV_HEROKU_APP_NAME\""
+  $stderr.puts "Skipping running xenv"
+  exit
+end
+
+begin
+  xenv = XEnv.from_uri(ENV["XENV_URL"])
+  heroku_token = xenv.heroku_platform_api_key
+
+  heroku = HerokuApp.new(heroku_token, ENV["XENV_HEROKU_APP_NAME"])
+
+  updated_config = ConfigMerger.call(heroku.envs, xenv.envs)
+  heroku.set_envs(updated_config)
+rescue HerokuApp::RuntimeError, XEnv::RuntimeError => e
+  $stderr.puts e.message
+  if ENV["XENV_PANIC_ON_ERROR"] == "true"
+    $stderr.puts "\"XENV_PANIC_ON_ERROR\" set to true - will exit with non-zero exit code"
+    exit 1
+  end
+end
